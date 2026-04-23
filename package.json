@@ -2,8 +2,9 @@
   "name": "simple-auto-complete",
   "displayName": "Simple Auto Complete",
   "description": "AI-powered code completion using Local AI API",
+  "publisher": "chenzyadb",
   "repository": "https://github.com/chenzyadb/Simple-Auto-Complete",
-  "version": "0.1.5",
+  "version": "0.2.0",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -11,27 +12,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:simpleAutoComplete.toggle",
-    "onLanguage:javascript",
-    "onLanguage:typescript",
-    "onLanguage:python",
-    "onLanguage:java",
-    "onLanguage:cpp",
-    "onLanguage:c",
-    "onLanguage:html",
-    "onLanguage:css",
-    "onLanguage:json",
-    "onLanguage:markdown",
-    "onLanguage:php",
-    "onLanguage:ruby",
-    "onLanguage:go",
-    "onLanguage:rust",
-    "onLanguage:swift",
-    "onLanguage:kotlin",
-    "onLanguage:scala",
-    "onLanguage:shellscript",
-    "onLanguage:yaml",
-    "onLanguage:xml"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -41,14 +22,21 @@
         "simpleAutoComplete.apiEndpoint": {
           "type": "string",
           "default": "http://127.0.0.1:1234",
-          "description": "AI API endpoint URL"
+          "description": "OpenAI API endpoint URL."
         },
-        "simpleAutoComplete.debounceDelay": {
+        "simpleAutoComplete.timeOut": {
           "type": "number",
-          "default": 200,
-          "minimum": 100,
-          "maximum": 1000,
-          "description": "Delay before triggering completion (in ms)"
+          "default": 1000,
+          "minimum": 500,
+          "maximum": 5000,
+          "description": "Request API Timeout(ms)."
+        },
+        "simpleAutoComplete.maxContextLines": {
+          "type": "number",
+          "default": 20,
+          "minimum": 5,
+          "maximum": 100,
+          "description": "Maximum number of lines to include as context for AI completion."
         }
       }
     }

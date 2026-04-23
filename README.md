@@ -13,7 +13,7 @@ An AI-powered intelligent code completion VSCode extension that leverages local 
 
 ## 📦 Requirements
 
-- Visual Studio Code v1.70.0+
+- Visual Studio Code v1.74.0+
 - Locally running AI service (such as [LMStudio](https://lmstudio.ai/))
 - AI service supporting OpenAI-compatible API
 
@@ -24,14 +24,16 @@ This extension provides the following configurable options:
 | Setting | Type | Default Value | Description |
 |--------|------|--------|------|
 | `simpleAutoComplete.apiEndpoint` | `string` | `"http://127.0.0.1:1234"` | LMStudio API endpoint URL |
-| `simpleAutoComplete.debounceDelay` | `number` | `200` | Delay time before triggering completion (milliseconds), range 100-1000 |
+| `simpleAutoComplete.timeOut` | `number` | `1000` | API request timeout (Milliseconds)，range 500-5000 |
+| `simpleAutoComplete.maxContextLines` | `number` | `20` | Maximum number of lines to include as context for AI completion，range 5-50 |
 
 ### Configuration Example
 
 ```json
 {
     "simpleAutoComplete.apiEndpoint": "http://127.0.0.1:1234",
-    "simpleAutoComplete.debounceDelay": 200
+    "simpleAutoComplete.timeOut": 1000,
+    "simpleAutoComplete.maxContextLines": 20
 }
 ```
 
@@ -86,8 +88,6 @@ If you encounter issues or have feature suggestions, please:
 
 ---
 
-⭐ If this extension helps you, please star the project!
-
 
 # Simple Auto Complete
 
@@ -104,7 +104,7 @@ If you encounter issues or have feature suggestions, please:
 
 ## 📦 安装要求
 
-- Visual Studio Code v1.70.0+
+- Visual Studio Code v1.74.0+
 - 本地运行的 AI 服务（如 [LMStudio](https://lmstudio.ai/)）
 - 支持 OpenAI 兼容 API 的 AI 服务
 
@@ -114,15 +114,17 @@ If you encounter issues or have feature suggestions, please:
 
 | 设置项 | 类型 | 默认值 | 描述 |
 |--------|------|--------|------|
-| `simpleAutoComplete.apiEndpoint` | `string` | `"http://127.0.0.1:1234"` | LMStudio API 端点 URL |
-| `simpleAutoComplete.debounceDelay` | `number` | `200` | 触发补全前的延迟时间（毫秒），范围 100-1000 |
+| `simpleAutoComplete.apiEndpoint` | `string` | `"http://127.0.0.1:1234"` | OpenAI API 端点 URL |
+| `simpleAutoComplete.timeOut` | `number` | `1000` | API请求超时时间（毫秒），范围 500-5000 |
+| `simpleAutoComplete.maxContextLines` | `number` | `20` | 最大上下文行数，范围 5-50 |
 
 ### 配置示例
 
 ```json
 {
     "simpleAutoComplete.apiEndpoint": "http://127.0.0.1:1234",
-    "simpleAutoComplete.debounceDelay": 200
+    "simpleAutoComplete.timeOut": 1000,
+    "simpleAutoComplete.maxContextLines": 20
 }
 ```
 
@@ -176,5 +178,3 @@ MIT License - 查看 LICENSE 文件了解详情
 - 查阅配置文档
 
 ---
-
-⭐ 如果这个扩展对您有帮助，请给项目加星！

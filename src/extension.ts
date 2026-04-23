@@ -1,94 +1,37 @@
 import * as vscode from 'vscode';
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let statusBarItem: vscode.StatusBarItem;
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Simple Auto Complete extension is now active!');
-
     // 创建状态栏项用于显示扩展状态
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBarItem.text = "$(zap) Auto Complete";
     statusBarItem.tooltip = "Auto Complete Active";
     statusBarItem.show();
 
+    // 创建补全提供者实例
+    const aiCompletionProvider = new AICompletionProvider(statusBarItem);
+
     // 注册补全项提供者
     const completionProvider = vscode.languages.registerCompletionItemProvider(
-        '*', // 支持所有语言
-        new AICompletionProvider(statusBarItem),
-        '=', ':', '.', '(', '[', ' ', '\t'
+        '*',
+        aiCompletionProvider,
+        '=', ':', '+', '-', '*', '/', '%', '&', '|', ',', '(', '[', '{', ' '
     );
 
-    // 监听文本变化事件
-    const textChangeDisposable = vscode.workspace.onDidChangeTextDocument((event) => {
-        handleTextChange(event.document);
-    });
-
-    // 监听编辑器切换事件
-    const editorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(() => {
-        resetDebounceTimer();
-    });
-
-    context.subscriptions.push(
-        completionProvider, 
-        textChangeDisposable, 
-        editorChangeDisposable,
-        statusBarItem
-    );
-}
-
-function handleTextChange(document: vscode.TextDocument) {
-    resetDebounceTimer();
-    
-    // 防抖延时
-    const debounceDelay = vscode.workspace.getConfiguration('simpleAutoComplete').get('debounceDelay', 200);
-
-    debounceTimer = setTimeout(() => {
-        const activeEditor = vscode.window.activeTextEditor;
-        
-        if (activeEditor && activeEditor.document === document) {
-            getContextCode(activeEditor);
-        }
-    }, debounceDelay);
-}
-
-function resetDebounceTimer() {
-    if (debounceTimer) {
-        clearTimeout(debounceTimer);
-        debounceTimer = null;
-    }
-}
-
-async function getContextCode(editor: vscode.TextEditor) {
-    const cursorPosition = editor.selection.active;
-    const document = editor.document;
-    
-    const startLine = Math.max(0, cursorPosition.line - 20);
-    const endLine = cursorPosition.line;
-    
-    const contextRange = new vscode.Range(
-        new vscode.Position(startLine, 0),
-        new vscode.Position(endLine, document.lineAt(endLine).range.end.character)
-    );
-    
-    const contextCode = document.getText(contextRange);
-    
-    // 存储上下文供补全提供者使用
-    AICompletionProvider.currentContext = contextCode;
+    // 添加到VSCode订阅管理
+    context.subscriptions.push(completionProvider, statusBarItem);
 }
 
 class AICompletionProvider implements vscode.CompletionItemProvider {
-    static currentContext: string = '';
     private statusBarItem: vscode.StatusBarItem;
+    private currentAbortController: AbortController | null = null;
 
     constructor(statusBarItem: vscode.StatusBarItem) {
         this.statusBarItem = statusBarItem;
     }
 
-    // 实现 handleDidShowCompletionItems 方法来处理补全项的显示
-    handleDidShowCompletionItems?(context: vscode.CompletionList): void {
-        // 可选的处理方法
-    }
+    handleDidShowCompletionItems?(context: vscode.CompletionList): void { }
 
     provideCompletionItems(
         document: vscode.TextDocument,
@@ -96,10 +39,30 @@ class AICompletionProvider implements vscode.CompletionItemProvider {
         token: vscode.CancellationToken,
         context: vscode.CompletionContext
     ): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList> {
+        // 检查触发上下文
+        if (context.triggerCharacter === '\t') {
+            console.log('Tab triggered completion');
+        }
+        
+        // 取消之前的请求
+        if (this.currentAbortController) {
+            this.currentAbortController.abort();
+        }
+        
+        // 创建新的AbortController用于当前请求
+        this.currentAbortController = new AbortController();
+        
+        // 监听VSCode的取消令牌
+        token.onCancellationRequested(() => {
+            if (this.currentAbortController) {
+                this.currentAbortController.abort();
+            }
+        });
+
         return this.provideAICompletions(document, position, token, context);
     }
 
-    private async provideAICompletions(
+    async provideAICompletions(
         document: vscode.TextDocument,
         position: vscode.Position,
         token: vscode.CancellationToken,
@@ -111,30 +74,46 @@ class AICompletionProvider implements vscode.CompletionItemProvider {
         this.statusBarItem.text = "$(sync~spin) Generating...";
         
         try {
-            // 构建上下文代码 - 获取光标前的文本和一些前面的行
-            const linesBefore = Math.min(20, position.line + 1); // 获取前20行或全部
+            const linesBefore = Math.min(100, position.line + 1); // 获取前100行
             let contextStartLine = Math.max(0, position.line - linesBefore + 1);
             
-            let contextCode = '';
-            for (let i = contextStartLine; i <= position.line; i++) {
-                const line = document.lineAt(i);
-                if (i === position.line) {
-                    // 当前行只取光标前的部分
-                    contextCode += line.text.substring(0, position.character);
-                } else {
-                    contextCode += line.text + '\n';
+            // 获取当前行光标前的内容
+            let contextCode = '\n' + document.lineAt(position.line).text.substring(0, position.character);
+
+            // 上下文行数限制
+            const maxContextLines = vscode.workspace.getConfiguration('simpleAutoComplete').get("maxContextLines", 20);
+
+            // 获取一些前面的行
+            if (position.line > 0) {
+                let contextLines = 1;
+                for (let i = (position.line - 1); i >= contextStartLine; i--) {
+                    const lineText = document.lineAt(i).text;
+
+                    // 忽略空行
+                    if (lineText.trim().length > 0) {
+                        contextCode = lineText + '\n' + contextCode;
+                        contextLines++;
+                    }
+
+                    // 达到上下文行数限制, 退出循环
+                    if (contextLines >= maxContextLines) {
+                        break;
+                    }
                 }
             }
             
-            // 存储当前上下文供后续使用
-            AICompletionProvider.currentContext = contextCode;
-            
             const completion = await this.getAICompletion(contextCode);
+            
+            // 检查请求是否被取消
+            if (token.isCancellationRequested || (this.currentAbortController && this.currentAbortController.signal.aborted)) {
+                return []; // 请求被取消，返回空数组
+            }
+            
             if (completion && completion.trim().length > 0) {
                 // 截取 completion 的前几个单词作为 label
                 let label = completion; 
-                if (completion.length > 32) {
-                    label = completion.substring(0, 32) + '...';
+                if (completion.length > 100) {
+                    label = completion.substring(0, 100);
                 }
                 
                 const item = new vscode.CompletionItem(label, vscode.CompletionItemKind.Snippet);
@@ -147,8 +126,12 @@ class AICompletionProvider implements vscode.CompletionItemProvider {
                 items.push(item);
             }
         } catch (error) {
-            this.showErrorNotification(error as Error);
+            this.handleError(error as Error);
         } finally {
+            // 清理当前的AbortController
+            if (this.currentAbortController) {
+                this.currentAbortController = null;
+            }
             // 恢复状态栏指示器
             this.statusBarItem.text = "$(zap) Auto Complete";
         }
@@ -158,9 +141,18 @@ class AICompletionProvider implements vscode.CompletionItemProvider {
 
     private async getAICompletion(contextCode: string): Promise<string | null> {
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+            // 使用当前的AbortController
+            const controller = this.currentAbortController;
+            
+            // 如果没有controller或者已经被取消，则直接返回
+            if (!controller || controller.signal.aborted) {
+                throw new Error('Request already cancelled');
+            }
 
+            const timeOutMs = vscode.workspace.getConfiguration('simpleAutoComplete').get("timeOut", 1000);
+            const timeoutId = setTimeout(() => controller.abort(), timeOutMs);
+
+            // 向AI发送请求
             const apiEndPoint = vscode.workspace.getConfiguration('simpleAutoComplete').get('apiEndpoint', 'http://127.0.0.1:1234');
             const response = await fetch(apiEndPoint + '/v1/chat/completions', {
                 method: 'POST',
@@ -188,8 +180,13 @@ class AICompletionProvider implements vscode.CompletionItemProvider {
 
             clearTimeout(timeoutId);
 
+            // 再次检查是否被取消
+            if (controller.signal.aborted) {
+                throw new Error('Request was cancelled');
+            }
+
             if (!response.ok) {
-                throw new Error(`API returned status ${response.status}: ${response.statusText}`);
+                throw new Error(`OpenAI API returned status ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
@@ -202,58 +199,37 @@ class AICompletionProvider implements vscode.CompletionItemProvider {
             
             return completion;
         } catch (error) {
-            this.showErrorNotification(error as Error);
+            this.handleError(error as Error);
             return null;
         }
     }
 
     private cleanUpCode(contextCode: string, completion: string): string {
+        // 移除Markdown部分并获取第一行
         completion = completion.replace(/^```[\w]*\n?/gm, '').replace(/\n?``` $ /gm, '').trim().split('\n')[0];
 
+        // 按行分割上下文
         const contextLines = contextCode.split('\n');
-        const lastContextLine = contextLines[contextLines.length - 1].replace(/^\s+/, '');
         
-        // 如果补全是基于最后一行的延续，移除重复部分
-        if (completion.startsWith(lastContextLine)) {
-            // 移除补全中与上下文重复的部分
-            completion = completion.substring(lastContextLine.length);
+        // 获取上下文的最后一行（去除前导空格）
+        const lastContextLine = contextLines[contextLines.length - 1].trimStart();
+        
+        // 去除重复部分
+        const index = completion.indexOf(lastContextLine);
+        if (index !== -1) {
+            return completion.substring(index + lastContextLine.length);
         }
         
         return completion;
     }
 
-    private showErrorNotification(error: Error) {
-        const errorMessage = error.message;
-        
-        // 根据错误类型显示不同的用户提示
-        if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('timeout')) {
-            vscode.window.showWarningMessage(
-                'AI API request timed out. Consider checking your model settings.',
-                'Retry', 'Settings'
-            ).then(selection => {
-                if (selection === 'Settings') {
-                    vscode.commands.executeCommand('workbench.action.openSettings', 'simple-auto-complete');
-                }
-            });
-        } else {
-            // 其他错误
-            vscode.window.showErrorMessage(
-                `AutoComplete error: ${errorMessage}`,
-                'Details', 'Report'
-            ).then(selection => {
-                if (selection === 'Details') {
-                    // 显示详细错误信息
-                    const outputChannel = vscode.window.createOutputChannel('Simple Auto Complete');
-                    outputChannel.appendLine(`AI API Error: ${errorMessage}`);
-                    outputChannel.show();
-                }
-            });
-        }
+    // 处理全部的错误信息
+    private handleError(error: Error) {
+        console.log('AutoComplete Error: ' + error.message);
     }
 }
 
 export function deactivate() {
-    resetDebounceTimer();
     if (statusBarItem) {
         statusBarItem.dispose();
     }
