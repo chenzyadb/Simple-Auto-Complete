@@ -1,0 +1,74 @@
+{
+  "name": "simple-auto-complete",
+  "displayName": "Simple Auto Complete",
+  "description": "AI-powered code completion using Local AI API",
+  "repository": "https://github.com/chenzyadb/Simple-Auto-Complete",
+  "version": "0.1.5",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:simpleAutoComplete.toggle",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:python",
+    "onLanguage:java",
+    "onLanguage:cpp",
+    "onLanguage:c",
+    "onLanguage:html",
+    "onLanguage:css",
+    "onLanguage:json",
+    "onLanguage:markdown",
+    "onLanguage:php",
+    "onLanguage:ruby",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:swift",
+    "onLanguage:kotlin",
+    "onLanguage:scala",
+    "onLanguage:shellscript",
+    "onLanguage:yaml",
+    "onLanguage:xml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Simple Auto Complete",
+      "properties": {
+        "simpleAutoComplete.apiEndpoint": {
+          "type": "string",
+          "default": "http://127.0.0.1:1234",
+          "description": "AI API endpoint URL"
+        },
+        "simpleAutoComplete.debounceDelay": {
+          "type": "number",
+          "default": 200,
+          "minimum": 100,
+          "maximum": 1000,
+          "description": "Delay before triggering completion (in ms)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
