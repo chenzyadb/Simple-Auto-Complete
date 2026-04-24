@@ -46,7 +46,7 @@ function activate(context) {
     // 创建补全提供者实例
     const aiCompletionProvider = new AICompletionProvider(statusBarItem);
     // 注册补全项提供者
-    const completionProvider = vscode.languages.registerCompletionItemProvider('*', aiCompletionProvider, '=', ':', '+', '-', '*', '/', '%', '&', '|', ',', '(', '[', '{', ' ');
+    const completionProvider = vscode.languages.registerCompletionItemProvider('*', aiCompletionProvider, '=', ':', '+', '-', '*', '/', '%', '&', '|', ',', '(', '[', '{', '<', '>', '\'', '\"');
     // 添加到VSCode订阅管理
     context.subscriptions.push(completionProvider, statusBarItem);
 }
@@ -84,7 +84,8 @@ class AICompletionProvider {
             const linesBefore = Math.min(100, position.line + 1); // 获取前100行
             let contextStartLine = Math.max(0, position.line - linesBefore + 1);
             // 获取当前行光标前的内容
-            let contextCode = '\n' + document.lineAt(position.line).text.substring(0, position.character);
+            const currentLine = document.lineAt(position.line).text;
+            let contextCode = '\n' + currentLine.substring(0, position.character);
             // 上下文行数限制
             const maxContextLines = vscode.workspace.getConfiguration('simpleAutoComplete').get("maxContextLines", 20);
             // 获取一些前面的行
@@ -103,7 +104,7 @@ class AICompletionProvider {
                     }
                 }
             }
-            const completion = await this.getAICompletion(contextCode);
+            const completion = await this.getAICompletion(document.fileName, document.languageId, contextCode);
             // 检查请求是否被取消
             if (token.isCancellationRequested || (this.currentAbortController && this.currentAbortController.signal.aborted)) {
                 return []; // 请求被取消，返回空数组
@@ -136,7 +137,7 @@ class AICompletionProvider {
         }
         return items;
     }
-    async getAICompletion(contextCode) {
+    async getAICompletion(fileName, fileType, contextCode) {
         try {
             // 使用当前的AbortController
             const controller = this.currentAbortController;
@@ -157,16 +158,16 @@ class AICompletionProvider {
                     model: "",
                     messages: [
                         {
-                            role: "system",
-                            content: "You are an expert code assistant. Provide only pure code completions without any markdown formatting, code block markers (like ```), language identifiers, or explanations. Return only the raw code that should be inserted directly into the editor. Do not repeat existing code from the context."
-                        },
-                        {
                             role: "user",
-                            content: `Complete the following code based on the context. Do not repeat existing code in context. context:\n${contextCode}\n`
+                            content: `You are an expert ${fileType} language Code Assistant.\nPlease complete the code.\nOutput ONLY the code that should be added, NO markdown, NO backticks, NO explanations.\nDO NOT repeat any code from context.\n\n\"${fileName}\" context:\n${contextCode}\n`
                         }
                     ],
-                    temperature: 0.2,
+                    temperature: 0.1,
                     max_tokens: 128,
+                    stop: ["<|endoftext|>", "\n\n"],
+                    top_p: 0.95,
+                    frequency_penalty: 0,
+                    presence_penalty: 0,
                     stream: false
                 }),
                 signal: controller.signal
