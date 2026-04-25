@@ -16,7 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
     const completionProvider = vscode.languages.registerCompletionItemProvider(
         '*',
         aiCompletionProvider,
-        '=', ':', '+', '-', '*', '/', '%', '&', '|', ',', '(', '[', '{', '<', '>', '\'', '\"'
+        '=', ':', '+', '-', '*', '/', '%', '&', '|', ',', '(', '[', '<', '>', '\'', '\"', ' '
     );
 
     // 添加到VSCode订阅管理
@@ -39,11 +39,6 @@ class AICompletionProvider implements vscode.CompletionItemProvider {
         token: vscode.CancellationToken,
         context: vscode.CompletionContext
     ): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList> {
-        // 检查触发上下文
-        if (context.triggerCharacter === '\t') {
-            console.log('Tab triggered completion');
-        }
-        
         // 取消之前的请求
         if (this.currentAbortController) {
             this.currentAbortController.abort();

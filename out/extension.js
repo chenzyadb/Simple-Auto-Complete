@@ -46,7 +46,7 @@ function activate(context) {
     // 创建补全提供者实例
     const aiCompletionProvider = new AICompletionProvider(statusBarItem);
     // 注册补全项提供者
-    const completionProvider = vscode.languages.registerCompletionItemProvider('*', aiCompletionProvider, '=', ':', '+', '-', '*', '/', '%', '&', '|', ',', '(', '[', '{', '<', '>', '\'', '\"');
+    const completionProvider = vscode.languages.registerCompletionItemProvider('*', aiCompletionProvider, '=', ':', '+', '-', '*', '/', '%', '&', '|', ',', '(', '[', '<', '>', '\'', '\"', ' ');
     // 添加到VSCode订阅管理
     context.subscriptions.push(completionProvider, statusBarItem);
 }
@@ -58,10 +58,6 @@ class AICompletionProvider {
     }
     handleDidShowCompletionItems(context) { }
     provideCompletionItems(document, position, token, context) {
-        // 检查触发上下文
-        if (context.triggerCharacter === '\t') {
-            console.log('Tab triggered completion');
-        }
         // 取消之前的请求
         if (this.currentAbortController) {
             this.currentAbortController.abort();

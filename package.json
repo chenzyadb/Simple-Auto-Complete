@@ -4,7 +4,7 @@
   "description": "AI-powered code completion using Local AI API",
   "publisher": "chenzyadb",
   "repository": "https://github.com/chenzyadb/Simple-Auto-Complete",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "engines": {
     "vscode": "^1.74.0"
   },
