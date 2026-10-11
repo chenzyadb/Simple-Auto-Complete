@@ -1,10 +1,10 @@
 {
   "name": "simple-auto-complete",
   "displayName": "Simple Auto Complete",
-  "description": "AI-powered code completion using Local AI API",
+  "description": "AI-powered code completion for LM Studio, OpenAI and any OpenAI-compatible API",
   "publisher": "chenzyadb",
   "repository": "https://github.com/chenzyadb/Simple-Auto-Complete",
-  "version": "0.3.1",
+  "version": "0.5.0",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -16,20 +16,97 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "simpleAutoComplete.triggerCompletion",
+        "title": "Simple Auto Complete: Trigger Completion Now"
+      },
+      {
+        "command": "simpleAutoComplete.setApiToken",
+        "title": "Simple Auto Complete: Set API Token"
+      },
+      {
+        "command": "simpleAutoComplete.clearApiToken",
+        "title": "Simple Auto Complete: Clear API Token"
+      },
+      {
+        "command": "simpleAutoComplete.testConnection",
+        "title": "Simple Auto Complete: Test Connection"
+      },
+      {
+        "command": "simpleAutoComplete.showLogs",
+        "title": "Simple Auto Complete: Show Logs"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "simpleAutoComplete.triggerCompletion",
+        "key": "ctrl+tab",
+        "mac": "ctrl+tab",
+        "when": "editorTextFocus && simpleAutoComplete.enabled"
+      }
+    ],
     "configuration": {
       "title": "Simple Auto Complete",
       "properties": {
         "simpleAutoComplete.apiEndpoint": {
           "type": "string",
           "default": "http://127.0.0.1:1234",
-          "description": "OpenAI API endpoint URL."
+          "markdownDescription": "Base URL of the chat API.\n\n- Local LM Studio: `http://127.0.0.1:1234`\n- OpenAI: `https://api.openai.com`\n- Any OpenAI-compatible server: e.g. `http://127.0.0.1:11434` (Ollama)\n\nThe `/v1/chat/completions` path is appended automatically unless the URL already ends with a version or `/chat/completions`."
+        },
+        "simpleAutoComplete.provider": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "lmstudio",
+            "openai",
+            "openai-compatible",
+            "deepseek",
+            "qwen",
+            "glm",
+            "kimi"
+          ],
+          "enumDescriptions": [
+            "Detect from the endpoint URL (OpenAI hosts -> openai, loopback -> lmstudio, otherwise openai-compatible).",
+            "LM Studio: local extras such as chat_template_kwargs.enable_thinking = false.",
+            "OpenAI: max_completion_tokens plus reasoning_effort = none / minimal.",
+            "Generic OpenAI-compatible server: standard chat/completions payload.",
+            "DeepSeek: thinking.type = disabled and reasoning_effort = none.",
+            "Qwen / DashScope: top-level enable_thinking = false.",
+            "GLM (Zhipu, Z.ai, Volcengine Ark): thinking.type = disabled.",
+            "Kimi / Moonshot: thinking.type = disabled."
+          ],
+          "default": "auto",
+          "description": "Which API dialect to speak. 'auto' detects it from the endpoint URL and model name, which is recommended."
+        },
+        "simpleAutoComplete.apiToken": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "API token sent as `Authorization: Bearer <token>`. Leave empty for local servers.\n\nPrefer the command **Simple Auto Complete: Set API Token**, which stores the token in VS Code Secret Storage instead of plain text settings. That value takes precedence over this setting."
+        },
+        "simpleAutoComplete.model": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Model id. Required for OpenAI (e.g. `gpt-4o-mini`, `gpt-5-mini`). For LM Studio an empty value makes the server use the model currently loaded."
+        },
+        "simpleAutoComplete.disableThinking": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Disable the model's thinking / reasoning phase to make completions as fast as possible.\n\n- DeepSeek: `thinking: { type: \"disabled\" }` with `reasoning_effort: \"none\"`\n- Qwen / DashScope: `enable_thinking: false`\n- GLM (Zhipu, Z.ai, Ark) and Kimi: `thinking: { type: \"disabled\" }`\n- LM Studio, vLLM, SGLang, llama.cpp: `chat_template_kwargs: { enable_thinking: false }`\n- OpenAI reasoning models: `reasoning_effort: \"none\"`, falling back to `\"minimal\"`\n\nIf a server rejects the field, the extension retries automatically with the other known switches, and finally without them. Note that some models (e.g. Kimi K3) always think and cannot be turned off."
+        },
+        "simpleAutoComplete.maxTokens": {
+          "type": "number",
+          "default": 128,
+          "minimum": 16,
+          "maximum": 4096,
+          "description": "Maximum number of tokens to generate for a completion."
         },
         "simpleAutoComplete.timeOut": {
           "type": "number",
-          "default": 1000,
+          "default": 3000,
           "minimum": 500,
-          "maximum": 5000,
-          "description": "Request API Timeout(ms)."
+          "maximum": 30000,
+          "markdownDescription": "Request timeout in milliseconds. Cloud APIs (DeepSeek, Qwen, GLM, Kimi) often need more than 1000 ms, so the default is 3000. If completions stop with a timeout message, raise this value."
         },
         "simpleAutoComplete.maxContextLines": {
           "type": "number",
@@ -37,6 +114,23 @@
           "minimum": 5,
           "maximum": 100,
           "description": "Maximum number of lines to include as context for AI completion."
+        },
+        "simpleAutoComplete.triggerDelay": {
+          "type": "number",
+          "default": 800,
+          "minimum": 100,
+          "maximum": 10000,
+          "markdownDescription": "How long the editor must stay idle (no typing, no cursor movement) before a completion is requested, in milliseconds. Completions appear as inline ghost text exactly after this pause, and are dismissed again as soon as you keep typing. Press `Ctrl+Tab` to request one immediately instead of waiting."
+        },
+        "simpleAutoComplete.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable AI completions."
+        },
+        "simpleAutoComplete.extraRequestBody": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Optional JSON object merged into the request body last, for provider-specific options. Example: `{\"reasoning_effort\": \"none\"}`."
         }
       }
     }
